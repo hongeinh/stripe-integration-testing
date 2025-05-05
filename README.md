@@ -33,6 +33,13 @@ To create a production version of your app:
 npm run build
 ```
 
+
+For stripe to listen to the webhook:
+```bash
+stripe login
+stripe listen --forward-to localhost:5173/api/webhook
+```
+
 You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
