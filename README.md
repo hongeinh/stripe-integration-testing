@@ -1,45 +1,23 @@
-# sv
+# TODO
+- [ ] Add detail to user subscription description: subscription name, start, end, price, status.
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
 
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```bash
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+# Stripe Integration
+1. Create a Stripe account and get your API keys.
+2. Create products in Product catalog.
+3. Create promo code in Product catalog > Coupon.
+4. Create a webhook in Developer > Webhooks. Register the webhook URL (must be https) and the events you want to listen to.
+5. Create a .env file in the root directory and add your Stripe API keys.
 
 ```bash
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-
+VITE_STRIPE_SECRET_KEY=
+VITE_STRIPE_PUBLISHABLE_KEY=
+VITE_STRIPE_WEBHOOK_SECRET=
+```  
+6. In test mode, install stripe CLI and run the following command to listen to the webhook:
 For stripe to listen to the webhook:
 ```bash
 stripe login
-stripe listen --forward-to localhost:5173/api/webhook
+# stripe listen --forward-to localhost:5173/api/webhook
+stripe listen --events payment_intent.created,customer.created,payment_intent.succeeded,checkout.session.completed,payment_intent.payment_failed --forward-to localhost:5173/api/webhook
 ```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
