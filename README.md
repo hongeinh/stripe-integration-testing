@@ -1,3 +1,39 @@
+# Firestore structure
+```
+users/{userId}
+  - id: string
+  - email: string
+  - name: string
+  - phone?: string
+  - avatarUrl?: string
+  - createdAt: string
+  - updatedAt: string
+
+users/{userId}/subscriptions/{userId}
+  - id: string
+  - userId: string
+  - subscriptionId: string
+  - subscriptionName: string
+  - priceId: string
+  - priceAmount: number
+  - currency: string
+  - status: string
+  - currentPeriodStart: string
+  - currentPeriodEnd: string
+  - promoCode?: string | null
+  - createdAt: string
+  - updatedAt: string
+
+users/{userId}/subscriptionHistory/{historyId}
+  - id: string
+  - subscriptionId: string
+  - priceId: string
+  - priceAmount: number
+  - currency: string
+  - promoCode?: string | null
+  - paid: boolean
+  - createdAt: string
+```
 # TODO
 - [ ] Add detail to user subscription description: subscription name, start, end, price, status.
 
@@ -21,3 +57,9 @@ stripe login
 # stripe listen --forward-to localhost:5173/api/webhook
 stripe listen --events payment_intent.created,customer.created,payment_intent.succeeded,checkout.session.completed,payment_intent.payment_failed --forward-to localhost:5173/api/webhook
 ```
+
+- Trigger `checkout.session.completed` event to create a subscription.
+```
+stripe trigger checkout.session.completed
+```
+7. Stripe test card visa: 4242424242424242

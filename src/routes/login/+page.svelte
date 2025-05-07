@@ -5,6 +5,7 @@
   import { goto } from "$app/navigation";
   import { doc, setDoc } from "firebase/firestore";
   import { db } from "$lib/firebase";
+  import { onMount } from "svelte";
 
   let email = "";
   let password = "";
@@ -24,54 +25,79 @@
   async function handleSubmit() {
     error = "";
     try {
+      let user;
       if (isRegister) {
-        const user = await registerUser(email, password);
-        createUser(user);
+        user = await registerUser(email, password);
+        await createUser(user);
         console.log("Registered:", user.uid);
       } else {
-        const user = await loginUser(email, password);
+        user = await loginUser(email, password);
         console.log("Logged in:", user.uid);
       }
-      goto(`/user/${auth.currentUser?.uid}`);
+      // Wait for auth state to update
+      const unsubscribe = auth.onAuthStateChanged((authUser) => {
+        if (authUser) {
+          console.log("Auth state confirmed:", authUser.uid);
+          goto(`/user/${authUser.uid}`);
+          unsubscribe();
+        }
+      });
     } catch (e) {
       error = (e as Error).message;
+      console.error("Auth error:", error);
     }
   }
+
+  onMount(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        console.log("User already logged in:", user.uid);
+        goto(`/user/${user.uid}`);
+      }
+    });
+    return () => unsubscribe();
+  });
 </script>
 
-<h1 class="text-xl font-bold">{isRegister ? "Register" : "Login"}</h1>
+<div
+  class="max-w-md mx-auto mt-8 p-4 bg-white shadow-md rounded-lg flex flex-col items-center"
+>
+  <h1 class="text-xl font-bold">{isRegister ? "Register" : "Login"}</h1>
 
-<form on:submit|preventDefault={handleSubmit} class="space-y-4">
-  <input
-    type="email"
-    bind:value={email}
-    placeholder="Email"
-    required
-    class="border p-2 w-full"
-  />
-  <input
-    type="password"
-    bind:value={password}
-    placeholder="Password"
-    required
-    class="border p-2 w-full"
-  />
+  <form on:submit|preventDefault={handleSubmit} class="space-y-4">
+    <input
+      type="email"
+      bind:value={email}
+      placeholder="Email"
+      required
+      class="border p-2 w-full rounded"
+    />
+    <input
+      type="password"
+      bind:value={password}
+      placeholder="Password"
+      required
+      class="border p-2 w-full rounded"
+    />
 
-  {#if error}
-    <p class="text-red-600">{error}</p>
-  {/if}
+    {#if error}
+      <p class="text-red-600">{error}</p>
+    {/if}
 
-  <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">
-    {isRegister ? "Register" : "Login"}
-  </button>
+    <div class="flex justify-between">
+      <button
+        type="button"
+        on:click={() => (isRegister = !isRegister)}
+        class="text-sm text-blue-700 underline"
+      >
+        {isRegister
+          ? "Already have an account? Login"
+          : "Don't have an account? Register"}
+      </button>
 
-  <button
-    type="button"
-    on:click={() => (isRegister = !isRegister)}
-    class="text-sm text-blue-700 underline"
-  >
-    {isRegister
-      ? "Already have an account? Login"
-      : "Don't have an account? Register"}
-  </button>
-</form>
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">
+        {isRegister ? "Register" : "Login"}
+      </button>
+    </div>
+  </form>
+</div>

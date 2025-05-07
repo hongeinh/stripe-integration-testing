@@ -36,17 +36,6 @@
     }
   }
 
-  async function test() {
-    const userId = auth.currentUser?.uid;
-    const res = await fetch("/api/test", {
-      method: "POST",
-      body: JSON.stringify({
-        userId: "test",
-        priceId: "price_1N9968Hq77t28L10Q0p6v36m",
-        promoCode: "test",
-      }),
-    });
-  }
 </script>
 
 <div class="max-w-md mx-auto mt-8 p-4 bg-white shadow-md rounded-lg">

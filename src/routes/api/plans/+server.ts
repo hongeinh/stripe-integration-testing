@@ -5,6 +5,10 @@ const stripe = new Stripe(import.meta.env.VITE_STRIPE_SECRET_KEY, {
     apiVersion: "2025-03-31.basil",
 });
 
+/**
+ * Get the list of products / plans from Stripe
+ * @returns 
+ */
 export const GET = async () => {
     const products = await stripe.products.list();
     const prices = await stripe.prices.list();

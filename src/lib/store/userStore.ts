@@ -1,15 +1,18 @@
 import { writable } from "svelte/store";
 import { db } from "$lib/firebase";
-import { adminDb } from "$lib/firebase-admin";
-import type { UserData } from "$lib/type";
-import { doc, getDoc } from "firebase/firestore";
+import type { SubscriptionHistory, UserData, UserSubscription } from "$lib/type";
+import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 
 export const userStore = writable<{
     isLoading: boolean;
     currentUser: UserData | null;
+    subscription: UserSubscription | null;
+    subscriptionHistory: SubscriptionHistory[] | null;
 }>({
     isLoading: true,
     currentUser: null,
+    subscription: null,
+    subscriptionHistory: null,
 });
 
 export const userHandler = {
@@ -18,27 +21,47 @@ export const userHandler = {
             throw new Error("User ID is required");
         }
 
+        userStore.update((store) => ({ ...store, isLoading: true }));
+
         try {
+            // Fetch userData from Firestore
             const userRef = doc(db, "users", userId);
             const userDoc = await getDoc(userRef);
             if (!userDoc.exists()) {
                 throw new Error("User not found");
             }
             const userData = userDoc.data() as UserData;
-            userStore.set({
+
+            // Fetch userSubscription data from Firestore
+            const subscriptionRef = doc(db, 'users', userId, 'subscriptions', userId);
+            const subscriptionDoc = await getDoc(subscriptionRef);
+            const subscriptionData = subscriptionDoc.exists() ? subscriptionDoc.data() as UserSubscription : null;
+
+            // Fetch userSubscriptionHistory data from Firestore
+            const subscriptionHistoryRef = collection(db, 'users', userId, 'subscriptionHistory');
+            const subscriptionHistoryQuery = query(subscriptionHistoryRef, orderBy("createdAt", "desc"));
+            const subscriptionHistorySnapshot = await getDocs(subscriptionHistoryQuery);
+            const subscriptionHistoryData = subscriptionHistorySnapshot.docs.map((doc) => doc.data() as SubscriptionHistory);
+            userStore.update((store) => ({
+                ...store,
                 isLoading: false,
                 currentUser: {
                     ...userData,
                     id: userDoc.id,
                 },
-            });
-            return userData;
+                subscription: subscriptionData
+                    ? { ...subscriptionData, id: subscriptionDoc.id, }
+                    : null,
+                subscriptionHistory: subscriptionHistoryData,
+            }));
+            console.log({ userData, subscriptionData, subscriptionHistoryData });
+            return { userData, subscriptionData, subscriptionHistoryData };
         } catch (error) {
             console.error("Error getting user:", error);
-            userStore.set({
+            userStore.update((store) => ({
+                ...store,
                 isLoading: false,
-                currentUser: null,
-            });
+            }));
             throw error;
         }
 
@@ -50,85 +73,59 @@ export const userHandler = {
         }
 
         try {
-            const usersSnapshot = await adminDb.collection("users").where("subscriptionId", "==", subscriptionId).limit(1).get();
+            const res = await fetch('/api/user/get-by-subscription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subscriptionId })
+            });
 
-            if (usersSnapshot.empty) {
-                console.warn("No user found with the provided subscription ID.");
-                return null;
+            if (!res.ok) {
+                const { error } = await res.json();
+                throw new Error(error || `Failed to get user with subscription: ${res.statusText}`);
             }
 
-            return usersSnapshot.docs[0].id;
+            const userId = await res.json();
+            return userId;
         } catch (error) {
             console.error("Error getting user with subscription:", error);
             throw error;
         }
     },
-    updateUser: async (userId: string, updatedData: Partial<UserData>) => {
+    updateUserSubscription: async (userId: string, updatedData: Partial<UserSubscription>) => {
+        /**
+         * Update user subscription data in Firestore (is used after a user has successfully subscribed to a plan)
+         */
         if (!userId) {
             throw new Error("User ID is required");
         }
 
         try {
-            const userRef = adminDb.collection("users").doc(userId);
-            const userDoc = await userRef.get();
-            const userData = userDoc.data() as UserData;
-            if (updatedData.email && updatedData.email !== userData.email) {
-                userData.email = updatedData.email;
-            }
-            if (updatedData.name && updatedData.name !== userData.name) {
-                userData.name = updatedData.name;
-            }
-
-            if (updatedData.subscriptionId && updatedData.subscriptionId !== userData.subscriptionId) {
-                userData.subscriptionId = updatedData.subscriptionId;
-                if (updatedData.status === "active") {
-                    userData.status = updatedData.status;
-                    userData.currentPeriodStart = updatedData.currentPeriodStart
-                        ? typeof updatedData.currentPeriodStart === "number"
-                            ? new Date(updatedData.currentPeriodStart * 1000).toISOString()
-                            : userData.currentPeriodStart
-                        : userData.currentPeriodStart;
-                    userData.currentPeriodEnd = updatedData.currentPeriodEnd
-                        ? typeof updatedData.currentPeriodEnd === "number"
-                            ? new Date(updatedData.currentPeriodEnd * 1000).toISOString()
-                            : userData.currentPeriodEnd
-                        : userData.currentPeriodEnd;
-
-                }
-
-                if (updatedData.promoCode) {
-                    userData.promoCode = updatedData.promoCode;
-                }
-            }
-
-            if (updatedData.status === "canceled" || updatedData.status === "expired" || updatedData.status === "inactive") {
-                userData.status = updatedData.status;
-                userData.subscriptionId = "";
-                userData.currentPeriodEnd = "";
-                userData.currentPeriodStart = "";
-            }
-
-            userData.updatedAt = new Date().toISOString();
-
-            if (userDoc.exists) {
-                await userRef.update(userData);
-            } else {
-                await userRef.set(userData);
-            }
-            userStore.set({
-                isLoading: false,
-                currentUser: {
-                    ...userData,
-                    id: userDoc.id,
-                },
+            const res = await fetch('/api/subscription/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, updatedData })
             });
-            return userData;
+
+            if (!res.ok) {
+                const { error } = await res.json();
+                throw new Error(error || `HTTP error! status: ${res.status}`);
+            }
+
+            const data = await res.json();
+            userStore.update((state) => ({
+                ...state,
+                isLoading: false,
+                subscription: { ...data, id: userId },
+            }))
+            return data;
+
         } catch (error) {
             console.error("Error updating user:", error);
-            userStore.set({
+            userStore.update((state) => ({
+                ...state,
                 isLoading: false,
-                currentUser: null,
-            });
+            })
+            );
             throw error;
         }
     },
@@ -139,7 +136,7 @@ export const userHandler = {
         }
 
         try {
-            const res = await fetch(`/api/subscribe/cancel`, {
+            const res = await fetch(`/api/subscription/cancel`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -147,10 +144,10 @@ export const userHandler = {
                 body: JSON.stringify({ userId }),
             });
 
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
-            }
             const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || data.message || "Failed to cancel subscription");
+            }
             return data;
         } catch (error) {
             console.error("Error canceling subscription:", error);
@@ -158,12 +155,15 @@ export const userHandler = {
         }
     },
 
-    subscribe: async (userId: string, subscriptionId: string, promoCode: string) => {
+    subscribe: async (userId: string, priceId: string, promoCode: string) => {
+        /**
+         * This function is used to subscribe a user to a subscription.
+         */
         if (!userId) {
             throw new Error("User ID is required");
         }
-        if (!subscriptionId) {
-            throw new Error("Subscription ID is required");
+        if (!priceId) {
+            throw new Error("Price ID is required");
         }
 
         try {
@@ -172,13 +172,13 @@ export const userHandler = {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ userId, priceId: subscriptionId, promoCode }),
+                body: JSON.stringify({ userId, priceId: priceId, promoCode }),
             });
 
-            if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
-            }
             const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || data.message || "Failed to subscribe");
+            }
             return data.url;
         } catch (error) {
             console.error("Error subscribing:", error);
@@ -186,13 +186,12 @@ export const userHandler = {
         }
     },
 
-    renewSubscription: async (userId: string) => {
+    getSubscriptionHistory: async (userId: string) => {
         if (!userId) {
             throw new Error("User ID is required");
         }
-
         try {
-            const res = await fetch(`/api/subscribe/renew`, {
+            const res = await fetch(`/api/subscription/history`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -201,13 +200,15 @@ export const userHandler = {
             });
 
             if (!res.ok) {
-                throw new Error(`HTTP error! status: ${res.status}`);
+                const { error } = await res.json();
+                throw new Error(error || "Failed to get subscription history");
             }
+
             const data = await res.json();
             return data;
         } catch (error) {
-            console.error("Error renewing subscription:", error);
+            console.error("Error getting subscription history:", error);
             throw error;
         }
-    }
+    },
 }

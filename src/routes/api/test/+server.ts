@@ -9,7 +9,7 @@ export async function POST({ request }) {
 
     try {
 
-        await userHandler.updateUser(userId, {
+        await userHandler.updateUserSubscription(userId, {
             subscriptionId: subscriptionId,
             status: "inactive",
             promoCode: appliedPromoCode as string,
