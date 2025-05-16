@@ -1,4 +1,45 @@
-# Firestore structure
+# STRIPE INTEGRATION WITH SVELTE, FIREBASE
+## Stripe core concepts
+1. Product:
+* Something u sell: product = subscription plan
+* Example: Basic, Business, Enterprise plans
+
+2. Price:
+* Defines how much and how often a customer is charged
+* For subscriptions, prices are recurring (per month)
+* Price is attached to a product.
+* Example: Business - $10/month
+
+3. Subscription:
+* When a customer agrees to pay for a price regularly
+* Stripe manages the subscription, charging the customer automatically and tracking its status (e.g., active, canceled)
+* Example: A customer subscribes to the "Basic Plan" for $10/month, and Stripe bills them every month.
+
+## Set up Stripe
+1. Set up Products
+2. Get Webhook secret: Go to developer mode -> Webhooks.
+- On production mode: Add destination
+- On development mode: Add local listener (follow given instructions)
+
+
+## Firestore
+### Rules
+```
+rules_version = '2';
+service cloud.firestore {
+    match /databases/{database}/documents {
+        match /users/{userId} {
+            allow read, write: if request.auth != null && request.auth.uid == userId;
+        }
+        match /users/{userId}/subscriptions/{subscriptionId} {
+            allow read, write: if request.auth != null && request.auth.uid == userId;
+            allow write: if request.auth == null; // Allow webhook
+        }
+    }
+}
+```
+
+### Collections
 ```
 users/{userId}
   - id: string
@@ -34,32 +75,46 @@ users/{userId}/subscriptionHistory/{historyId}
   - paid: boolean
   - createdAt: string
 ```
-# TODO
-- [ ] Add detail to user subscription description: subscription name, start, end, price, status.
 
-
-# Stripe Integration
-1. Create a Stripe account and get your API keys.
-2. Create products in Product catalog.
-3. Create promo code in Product catalog > Coupon.
-4. Create a webhook in Developer > Webhooks. Register the webhook URL (must be https) and the events you want to listen to.
-5. Create a .env file in the root directory and add your Stripe API keys.
-
+## Setup project
+1. Install dependencies
+```bash
+npm install
+```
+2. Get Stripe webhook secret
+```bash
+stripe login # then copy the webhook secret
+```
+3. Create a .env file in the root directory and add your Stripe API keys.
 ```bash
 VITE_STRIPE_SECRET_KEY=
 VITE_STRIPE_PUBLISHABLE_KEY=
 VITE_STRIPE_WEBHOOK_SECRET=
-```  
-6. In test mode, install stripe CLI and run the following command to listen to the webhook:
-For stripe to listen to the webhook:
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_PRIVATE_KEY=
+VITE_FIREBASE_CLIENT_EMAIL=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+```
+
+4. (Test mode) Turn on Stripe webhook listener
 ```bash
-stripe login
-# stripe listen --forward-to localhost:5173/api/webhook
 stripe listen --events payment_intent.created,customer.created,payment_intent.succeeded,checkout.session.completed,payment_intent.payment_failed --forward-to localhost:5173/api/webhook
 ```
 
-- Trigger `checkout.session.completed` event to create a subscription.
+5. Run the development server:
+```bash
+npm run dev
 ```
-stripe trigger checkout.session.completed
-```
-7. Stripe test card visa: 4242424242424242
+
+Stripe test card visa: 4242424242424242
+
+
+# TODO
+- [ ] Add detail to user subscription description: subscription name, start, end, price, status.
+
+
+
