@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { json } from "@sveltejs/kit";
 import { adminDb } from "$lib/firebase-admin.js";
-import type { SubscriptionUserItem, SubscriptionUserList, Subscription, SubscriptionLocationItem, SubscriptionLocationList } from "$lib/type.js";
+import type { Subscription, SubscriptionUserItem, SubscriptionUserList, SubscriptionLocationItem, SubscriptionLocationList } from "$lib/type.js";
 import { v4 as uuidv4 } from "uuid";
 
 const stripe = new Stripe(import.meta.env.VITE_STRIPE_SECRET_KEY, {
@@ -10,14 +10,14 @@ const stripe = new Stripe(import.meta.env.VITE_STRIPE_SECRET_KEY, {
 const endpointSecret = import.meta.env.VITE_STRIPE_WEBHOOK_SECRET;
 
 export async function POST({ request }) {
-    const sig = request.headers.get('stripe-signature');
+    const sig = request.headers.get("stripe-signature");
     const body = await request.text();
 
     if (!sig) {
-        return new Response('Webhook error: Missing Stripe signature header', { status: 400 });
+        return new Response("Webhook error: Missing Stripe signature header", { status: 400 });
     }
 
-    let event;
+    let event: Stripe.Event;
     try {
         event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
     } catch (err) {
@@ -25,43 +25,32 @@ export async function POST({ request }) {
         return new Response(`Webhook Error: ${err}`, { status: 400 });
     }
 
-
     try {
-        if (event.type === 'checkout.session.completed') {
-            console.log('Received event:', event.type);
+        console.log("Received event:", event.type);
+        if (event.type === "checkout.session.completed") {
             await handleCheckoutSessionCompleted(event);
-        } else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-            console.log('Received event:', event.type);
+        } else if (event.type === "customer.subscription.updated" || event.type === "customer.subscription.deleted") {
             await handleEventSubscriptionUpdate(event);
-        } else if (event.type === 'invoice.payment_succeeded') {
-            console.log('Received event:', event.type);
+        } else if (event.type === "invoice.payment_succeeded") {
             await handleInvoicePaymentSucceeded(event);
-        } else if (event.type === 'invoice.payment_failed') {
-            console.log('Received event:', event.type);
+        } else if (event.type === "invoice.payment_failed") {
             await handleInvoicePaymentFailed(event);
-        } else {
-            console.log('Received event:', event.type);
         }
-
         return json({ received: true });
     } catch (error) {
-        console.error('Error processing event:', error);
+        console.error(`Error processing event ${event.type}:`, error);
         return new Response(`Error processing event: ${(error as Error).message}`, { status: 500 });
     }
 }
 
 async function handleCheckoutSessionCompleted(event: Stripe.Event) {
-    /**
-     * Handle checkout session completed event for first time subscription
-     */
     const session = event.data.object as Stripe.Checkout.Session;
-    const clientReferenceId = session.client_reference_id;
     const subscriptionId = session.subscription as string;
+    const clientReferenceId = session.client_reference_id;
     const appliedPromoCode = session?.discounts?.[0]?.promotion_code || null;
-
-
+    
     if (!clientReferenceId || !subscriptionId) {
-        return new Response(`Missing userId or subscriptionId user: ${clientReferenceId}, subscriptionId: ${subscriptionId}`, { status: 400 });
+        return new Response(`Missing clientReferenceId or subscriptionId: ${clientReferenceId}, ${subscriptionId}`, { status: 400 });
     }
 
     const userId = session.metadata?.["userId"];
@@ -91,6 +80,7 @@ async function handleCheckoutSessionCompleted(event: Stripe.Event) {
             amountTotal: session.amount_total || price.unit_amount || 0,
             currency: price.currency || "usd",
             currentPeriodStart: currentPeriodStart,
+            stripeCustomerId: subscription.customer as string,
             currentPeriodEnd: currentPeriodEnd,
         };
 
@@ -134,8 +124,8 @@ async function handleCheckoutSessionCompleted(event: Stripe.Event) {
         }
 
     } catch (error) {
-        console.error('Error updating user document:', error);
-        return new Response(`Database error: ${(error as Error).message}`, { status: 500 })
+        console.error("Error handling checkout.session.completed:", error);
+        throw error;
     }
 
 }
@@ -147,13 +137,11 @@ async function handleEventSubscriptionUpdate(event: Stripe.Event) {
     console.log("old subscription", subscription);
     try {
         const expandedSubscription = await stripe.subscriptions.retrieve(subscriptionId, {
-            expand: ["items.data.price.product"],
-        }) as Stripe.Subscription;
-        console.log("new subscription", expandedSubscription);
+            expand: ["items.data.price.product", "customer"],
+        });
         const item = expandedSubscription.items.data[0];
         const product = item.price.product as Stripe.Product;
         const metadataType = product.metadata.type;
-
 
         let status: Subscription["status"] = expandedSubscription.status as Subscription["status"];
         if (event.type === "customer.subscription.deleted") {
@@ -173,6 +161,7 @@ async function handleEventSubscriptionUpdate(event: Stripe.Event) {
             currency: item.price.currency || "usd",
             currentPeriodStart: currentPeriodStart,
             currentPeriodEnd: currentPeriodEnd,
+            stripeCustomerId: expandedSubscription.customer as string,
         };
 
         const subscriptionItem: SubscriptionUserItem | SubscriptionLocationItem = {
@@ -446,12 +435,13 @@ async function getUserWithSubscription(subscriptionId: string) {
 
     try {
         const userSnapshot = await adminDb.collection("subscriptionUserList")
-            .where("subscriptions", "array-contains", { id: subscriptionId })
+            .where("subscriptions.id", "==", subscriptionId)
             .limit(1)
             .get();
+        console.log({ userSnapshot });
         return userSnapshot.empty ? null : userSnapshot.docs[0].id;
     } catch (error) {
-        console.error("Error fetching user with subscription:", error);
+        console.error(error);
         return null;
     }
 }
@@ -463,7 +453,7 @@ async function getLocationWithSubscription(subscriptionId: string) {
 
     try {
         const locationSnapshot = await adminDb.collection("subscriptionLocationList")
-            .where("subscriptions", "array-contains", { id: subscriptionId })
+            .where("subscriptions.id", "==", subscriptionId)
             .limit(1)
             .get();
         if (locationSnapshot.empty) {
