@@ -102,7 +102,7 @@ VITE_FIREBASE_APP_ID=
 
 4. (Test mode) Turn on Stripe webhook listener
 ```bash
-stripe listen --events payment_intent.created,customer.created,payment_intent.succeeded,checkout.session.completed,payment_intent.payment_failed --forward-to localhost:5173/api/webhook
+stripe listen --events payment_intent.created,customer.created,payment_intent.succeeded,checkout.session.completed,payment_intent.payment_failed,customer.subscription.deleted --forward-to localhost:5173/api/webhook
 ```
 
 5. Run the development server:

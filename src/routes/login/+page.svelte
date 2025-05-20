@@ -29,15 +29,12 @@
       if (isRegister) {
         user = await registerUser(email, password);
         await createUser(user);
-        console.log("Registered:", user.uid);
       } else {
         user = await loginUser(email, password);
-        console.log("Logged in:", user.uid);
       }
       // Wait for auth state to update
       const unsubscribe = auth.onAuthStateChanged((authUser) => {
         if (authUser) {
-          console.log("Auth state confirmed:", authUser.uid);
           goto(`/user/${authUser.uid}`);
           unsubscribe();
         }
@@ -51,7 +48,6 @@
   onMount(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (user) {
-        console.log("User already logged in:", user.uid);
         goto(`/user/${user.uid}`);
       }
     });

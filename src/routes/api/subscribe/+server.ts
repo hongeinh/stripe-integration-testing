@@ -10,11 +10,11 @@ const stripe = new Stripe(import.meta.env.VITE_STRIPE_SECRET_KEY, {
 export async function POST({ request, url }) {
 
 
-    const { priceId, userId, promoCode } = await request.json();
+    const { priceId, userId, promoCode, locationId } = await request.json();
     if (!priceId || !userId) {
         return json({ error: "Price ID and User ID are required" }, { status: 400 });
     }
-    console.log(priceId, userId, promoCode)
+    console.log("price", priceId, "userId", userId, "promoCode", promoCode, "locationId", locationId)
 
     let discounts: { promotion_code: string }[] = []
     if (promoCode) {
@@ -45,7 +45,7 @@ export async function POST({ request, url }) {
             line_items: [{ price: priceId, quantity: 1 }],
             client_reference_id: userId,
             metadata: {
-                userId, priceId
+                userId, priceId, locationId
             },
             discounts,
             success_url: `${baseUrl}/user/${userId}?status=success&priceId=${priceId}`,

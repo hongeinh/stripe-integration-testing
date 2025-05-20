@@ -1,18 +1,18 @@
 import { writable } from "svelte/store";
 import { db } from "$lib/firebase";
-import type { SubscriptionHistory, UserData, UserSubscription } from "$lib/type";
-import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
+import type { User, SubscriptionUserItem, SubscriptionUserList, SubscriptionLocationList, Location } from "$lib/type";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 
 export const userStore = writable<{
     isLoading: boolean;
-    currentUser: UserData | null;
-    subscription: UserSubscription | null;
-    subscriptionHistory: SubscriptionHistory[] | null;
+    currentUser: User | null;
+    userSubscriptions: SubscriptionUserList | null;
+    locationSubscriptions: SubscriptionLocationList | null;
 }>({
     isLoading: true,
     currentUser: null,
-    subscription: null,
-    subscriptionHistory: null,
+    userSubscriptions: null,
+    locationSubscriptions: null,
 });
 
 export const userHandler = {
@@ -30,18 +30,19 @@ export const userHandler = {
             if (!userDoc.exists()) {
                 throw new Error("User not found");
             }
-            const userData = userDoc.data() as UserData;
+            const userData = userDoc.data() as User;
 
             // Fetch userSubscription data from Firestore
-            const subscriptionRef = doc(db, 'users', userId, 'subscriptions', userId);
+            const subscriptionRef = doc(db, 'subscriptionUserList', userId);
             const subscriptionDoc = await getDoc(subscriptionRef);
-            const subscriptionData = subscriptionDoc.exists() ? subscriptionDoc.data() as UserSubscription : null;
+            const subscriptionData = (subscriptionDoc.exists() ? subscriptionDoc.data() : null) as SubscriptionUserList;
 
+            // Fetch locationSubscription data from Firestore
+            const locationSubscriptionRef = doc(db, 'subscriptionLocationList', userData.currentLocationId);
+            const locationSubscriptionDoc = await getDoc(locationSubscriptionRef);
+            const locationSubscriptionData = (locationSubscriptionDoc.exists() ? locationSubscriptionDoc.data() : null) as SubscriptionLocationList;
+            
             // Fetch userSubscriptionHistory data from Firestore
-            const subscriptionHistoryRef = collection(db, 'users', userId, 'subscriptionHistory');
-            const subscriptionHistoryQuery = query(subscriptionHistoryRef, orderBy("createdAt", "desc"));
-            const subscriptionHistorySnapshot = await getDocs(subscriptionHistoryQuery);
-            const subscriptionHistoryData = subscriptionHistorySnapshot.docs.map((doc) => doc.data() as SubscriptionHistory);
             userStore.update((store) => ({
                 ...store,
                 isLoading: false,
@@ -49,13 +50,15 @@ export const userHandler = {
                     ...userData,
                     id: userDoc.id,
                 },
-                subscription: subscriptionData
-                    ? { ...subscriptionData, id: subscriptionDoc.id, }
+                userSubscriptions: subscriptionData
+                    ? { ...subscriptionData }
                     : null,
-                subscriptionHistory: subscriptionHistoryData,
+                locationSubscriptions: locationSubscriptionData
+                    ? { ...locationSubscriptionData }
+                    : null,
             }));
-            console.log({ userData, subscriptionData, subscriptionHistoryData });
-            return { userData, subscriptionData, subscriptionHistoryData };
+            console.log({ userData, subscriptionData, locationSubscriptionData });
+            return { userData, subscriptionData, locationSubscriptionData };
         } catch (error) {
             console.error("Error getting user:", error);
             userStore.update((store) => ({
@@ -65,6 +68,43 @@ export const userHandler = {
             throw error;
         }
 
+    },
+
+    changeEmployeeLocation: async (locationId: string, userId: string, newLocationId: string) => {
+        if (!locationId || !userId || !newLocationId) {
+            throw new Error("Location ID and User ID are required");
+        }
+        
+        try {
+            // update old location
+            const locationRef = doc(db, 'locations', locationId);
+            const locationDoc = await getDoc(locationRef);
+            const locationData = locationDoc.data() as Location;
+            locationData.employeeIds = locationData.employeeIds.filter((user) => user !== userId);
+            await updateDoc(locationRef, { employeeIds: locationData.employeeIds });
+
+            // update user location
+            const userRef = doc(db, 'users', userId);
+            const userDoc = await getDoc(userRef);
+            const userData = userDoc.data() as User;
+            userData.currentLocationId = newLocationId;
+            await updateDoc(userRef, { currentLocationId: newLocationId });
+
+            // update new location
+            const newLocationRef = doc(db, 'locations', newLocationId);
+            const newLocationDoc = await getDoc(newLocationRef);
+            const newLocationData = newLocationDoc.data() as Location;
+            newLocationData.employeeIds.push(userId);
+            await updateDoc(newLocationRef, { employeeIds: newLocationData.employeeIds });
+            
+            await updateDoc(userRef, {
+                ...userData,
+            });
+            return userData;
+        } catch (error) {
+            console.error("Error updating user location", error);
+            return null;
+        }
     },
 
     getUserWithSubscription: async (subscriptionId: string) => {
@@ -91,7 +131,7 @@ export const userHandler = {
             throw error;
         }
     },
-    updateUserSubscription: async (userId: string, updatedData: Partial<UserSubscription>) => {
+    updateUserSubscription: async (userId: string, updatedData: Partial<SubscriptionUserItem>) => {
         /**
          * Update user subscription data in Firestore (is used after a user has successfully subscribed to a plan)
          */
@@ -115,7 +155,7 @@ export const userHandler = {
             userStore.update((state) => ({
                 ...state,
                 isLoading: false,
-                subscription: { ...data, id: userId },
+                userSubscriptions: { ...data, id: userId },
             }))
             return data;
 
@@ -130,7 +170,7 @@ export const userHandler = {
         }
     },
 
-    cancelSubscription: async (userId: string) => {
+    cancelSubscription: async (userId: string, subscriptionId: string, type: "user" | "location") => {
         if (!userId) {
             throw new Error("User ID is required");
         }
@@ -141,7 +181,7 @@ export const userHandler = {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ userId }),
+                body: JSON.stringify({ userId, subscriptionId, type }),
             });
 
             const data = await res.json();
@@ -155,7 +195,7 @@ export const userHandler = {
         }
     },
 
-    subscribe: async (userId: string, priceId: string, promoCode: string) => {
+    subscribe: async (userId: string, locationId: string, priceId: string, promoCode: string) => {
         /**
          * This function is used to subscribe a user to a subscription.
          */
@@ -172,7 +212,7 @@ export const userHandler = {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ userId, priceId: priceId, promoCode }),
+                body: JSON.stringify({ userId, priceId: priceId, promoCode, locationId }),
             });
 
             const data = await res.json();
@@ -186,29 +226,40 @@ export const userHandler = {
         }
     },
 
-    getSubscriptionHistory: async (userId: string) => {
-        if (!userId) {
-            throw new Error("User ID is required");
+
+    updateUserLocation: async (userId: string, locationId: string) => {
+        if (!userId || !locationId) {
+            throw new Error("User ID and Location ID are required");
         }
+
         try {
-            const res = await fetch(`/api/subscription/history`, {
+            const res = await fetch(`/api/user/update-location`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ userId }),
+                body: JSON.stringify({ userId, locationId }),
             });
 
             if (!res.ok) {
                 const { error } = await res.json();
-                throw new Error(error || "Failed to get subscription history");
+                throw new Error(error || "Failed to update user location");
             }
 
             const data = await res.json();
+            userStore.update((store) => ({
+                ...store,
+                currentUser: store.currentUser ? {
+                    ...store.currentUser,
+                    currentLocationId: locationId
+                } : null
+            }));
             return data;
         } catch (error) {
-            console.error("Error getting subscription history:", error);
+            console.error("Error updating user location:", error);
             throw error;
         }
     },
+
+
 }

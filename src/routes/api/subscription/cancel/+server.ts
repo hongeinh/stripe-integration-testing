@@ -8,26 +8,29 @@ const stripe = new Stripe(import.meta.env.VITE_STRIPE_SECRET_KEY, {
 });
 
 export async function POST({ request }: { request: Request }) {
-    const { userId } = await request.json();
+    const { userId, type, subscriptionId } = await request.json();
     if (!userId) {
         return json({ error: "User ID is required" }, { status: 400 });
     }
 
     try {
-        const subscriptionDoc = await adminDb.collection("users").doc(userId).collection("subscriptions").doc(userId).get();
+        const subscriptionListName = type === "user" ? "subscriptionUserList" : "subscriptionLocationList";
+        const subscriptionDoc = await adminDb.collection(subscriptionListName).doc(userId).get();
         if (!subscriptionDoc.exists) {
-            return json({ error: `User ${userId} does not have an active subscription` }, { status: 400 });
+            return json({ error: `${type} ${userId} does not have an active subscription` }, { status: 400 });
         }
-    
-        const subscriptionId = subscriptionDoc.data()?.subscriptionId;
-        if (!subscriptionId) {
-            return json({ error: `User ${userId} does not have an active subscription` }, { status: 400 });
+        const currentSubscriptions = subscriptionDoc.data()?.subscriptions;
+        
+        for (const subscription of currentSubscriptions) {
+            if (subscription.id !== subscriptionId) {
+                continue;
+            }
+            if (subscription.status !== "active") {
+                return json({ error: `Subscription is not active` }, { status: 400 });
+            }
+            console.log("Cancelling subscription", subscriptionId);
+            await stripe.subscriptions.cancel(subscriptionId);
         }
-
-        await stripe.subscriptions.cancel(subscriptionId);
-        await userHandler.updateUserSubscription(userId, {
-            status: "canceled",
-        });
 
         return json({ message: "Subscription canceled successfully", success: true }, { status: 200 });
 

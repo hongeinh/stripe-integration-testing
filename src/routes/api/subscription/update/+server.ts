@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { adminDb } from "$lib/firebase-admin";
-import type { UserSubscription, SubscriptionHistory } from "$lib/type";
+import type { SubscriptionUserItem, SubscriptionHistory } from "$lib/type";
 import { v4 as uuidv4 } from "uuid";
 
 /**
@@ -20,7 +20,7 @@ export async function POST({ request }: { request: Request }) {
         // subscriptionRef is used in case user renew current subscription
         const subscriptionRef = adminDb.collection("users").doc(userId).collection("subscriptions").doc(userId);
         const subscriptionDoc = await subscriptionRef.get();
-        let subscriptionData = (subscriptionDoc.exists ? subscriptionDoc.data() : { id: userId, userId }) as UserSubscription;
+        let subscriptionData = (subscriptionDoc.exists ? subscriptionDoc.data() : { id: userId, userId }) as SubscriptionUserItem;
 
         // Prepare history entry if subscription changes
         let historyEntry: SubscriptionHistory | null = null;
@@ -31,7 +31,7 @@ export async function POST({ request }: { request: Request }) {
                 userId,
                 subscriptionId: updatedData.subscriptionId,
                 priceId: updatedData.priceId || subscriptionData.priceId || "",
-                priceAmount: updatedData.priceAmount || subscriptionData.priceAmount || 0,
+                priceAmount: updatedData.priceAmount || subscriptionData.amountSubtotal || 0,
                 currency: updatedData.currency || subscriptionData.currency || "usd",
                 promoCode: updatedData?.promoCode,
                 paid: updatedData.status === "active",
@@ -42,7 +42,7 @@ export async function POST({ request }: { request: Request }) {
         if (updatedData.subscriptionId) subscriptionData.subscriptionId = updatedData.subscriptionId;
         if (updatedData.subscriptionName) subscriptionData.subscriptionName = updatedData.subscriptionName;
         if (updatedData.priceId) subscriptionData.priceId = updatedData.priceId;
-        if (updatedData.priceAmount !== undefined) subscriptionData.priceAmount = updatedData.priceAmount;
+        if (updatedData.priceAmount !== undefined) subscriptionData.amountSubtotal = updatedData.priceAmount;
         if (updatedData.currency) subscriptionData.currency = updatedData.currency;
         if (updatedData.status) {
             subscriptionData.status = updatedData.status;
@@ -61,7 +61,7 @@ export async function POST({ request }: { request: Request }) {
             }
         }
 
-        if (updatedData.promoCode !== undefined) subscriptionData.promoCode = updatedData.promoCode;
+        if (updatedData.promoCode !== undefined) subscriptionData.discounts = updatedData.promoCode;
 
         subscriptionData.updatedAt = new Date().toISOString();
 

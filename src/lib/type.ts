@@ -30,10 +30,24 @@ export interface Location {
     employeeIds: string[],
 }
 
+export interface Subscription {
+    // short info of the subscription
+    id: string; // subscription id
+    name: string;
+    priceId: string;
+    status: "active" | "canceled" | "unpaid" | "paused" | "incomplete_expired" | "past_due";
+    amountSubtotal: number; // in cents
+    amountTotal: number; // in cents, final price after discount
+    currency: string;
+    currentPeriodStart: string; // ISO string
+    currentPeriodEnd: string; // ISO string
+    stripeCustomerId?: string; // Stripe customer ID
+
+}
 
 export interface SubscriptionUserList {
     id: string; // user id
-    subscriptionIds: string[]; // list of subscription belongs to the user (the user subscribes to)
+    subscriptions: Subscription[]; // list of subscription belongs to the user (the user subscribes to)
     cardInfo: {
         cardId: string;
         cardOwnerName: string;
@@ -46,11 +60,16 @@ export interface SubscriptionUserList {
 }
 
 
+export interface SubscriptionLocationList extends SubscriptionUserList {
+    // id = location id
+}
 
+// History of the subscription
 export interface SubscriptionUserItem {
     id: string; // subscription id
     userId: string;
 
+    subscriptionId: string;
     subscriptionName: string
     priceId: string;
     status: "active" | "canceled" | "unpaid" | "paused" | "incomplete_expired" | "past_due";
@@ -62,14 +81,14 @@ export interface SubscriptionUserItem {
 
     currentPeriodStart: string; // ISO string
     currentPeriodEnd: string; // ISO string
-    
+
     invoiceId: string; // invoice of this subscription item
     invoiceLink: string; // link to the invoice
     paymentStatus: "paid" | "unpaid" | "partially_paid";
     paidDate: string | null; // ISO string
 
     taxData: {
-        rate: number;
+        rate: number | string | null;
         amount: number; // in cents
     }
     createdAt: string; // ISO string
@@ -78,48 +97,8 @@ export interface SubscriptionUserItem {
 
 
 
-export interface SubscriptionLocationList {
-    id: string; // location id
-    subscriptionIds: string[]; // list of subscription belongs to the location
-    cardInfo: {
-        cardId: string;
-        cardOwnerName: string;
-        cardBrand: string;
-        cardLast4: string;
-        cardExpiry: string;
-    }
-    createdAt: string; // ISO string
-    updatedAt: string; // ISO string
-}
-
-export interface SubscriptionLocationItem {
-    id: string; // subscription id
+export interface SubscriptionLocationItem extends SubscriptionUserItem {
     locationId: string;
-    userId: string; // user who initiated the subscription
-
-    subscriptionName: string
-    priceId: string;
-    status: "active" | "canceled" | "unpaid" | "paused" | "incomplete_expired" | "past_due";
-
-    amountSubtotal: number; // in cents
-    amountTotal: number; // in cents, final price after discount
-    currency: string;
-    discounts?: string | null;
-
-    currentPeriodStart: string; // ISO string
-    currentPeriodEnd: string; // ISO string
-    
-    invoiceId: string; // invoice of this subscription item
-    invoiceLink: string; // link to the invoice
-    paymentStatus: "paid" | "unpaid" | "partially_paid";
-    paidDate: string | null; // ISO string
-
-    taxData: {
-        rate: number;
-        amount: number; // in cents
-    }
-    createdAt: string; // ISO string
-    updatedAt: string; // ISO string
 }
 
 

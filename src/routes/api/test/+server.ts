@@ -12,7 +12,7 @@ export async function POST({ request }) {
         await userHandler.updateUserSubscription(userId, {
             subscriptionId: subscriptionId,
             status: "inactive",
-            promoCode: appliedPromoCode as string,
+            discounts: appliedPromoCode as string,
             updatedAt: new Date().toISOString(),
         });
 
