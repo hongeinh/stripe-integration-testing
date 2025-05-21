@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { goto } from "$app/navigation";
     import { userHandler } from "$lib/store/userStore";
     import type { Subscription } from "$lib/type";
     export let subscriptions: Subscription[];
@@ -99,7 +100,9 @@
                     <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
                     >
-                        <button class="text-blue-600 hover:text-blue-800">
+                        <button 
+                        on:click={() => {goto(`/user/${userId}/subscription/${type}/${subscription.id}`)}}
+                        class="text-blue-600 hover:text-blue-800">
                             View History
                         </button>
                     </td>
