@@ -45,16 +45,19 @@ export interface Subscription {
 
 }
 
+export interface CardInfo {
+    cardId: string;
+    cardOwnerName: string;
+    cardBrand: string;
+    cardLast4: string;
+    cardExpiry: string
+}
+
 export interface SubscriptionUserList {
     id: string; // user id
     subscriptions: Subscription[]; // list of subscription belongs to the user (the user subscribes to)
-    cardInfo: {
-        cardId: string;
-        cardOwnerName: string;
-        cardBrand: string;
-        cardLast4: string;
-        cardExpiry: string;
-    }
+    cardInfo: CardInfo;
+    payerUserId: string;
     createdAt: string; // ISO string
     updatedAt: string; // ISO string
 }
