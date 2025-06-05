@@ -113,8 +113,25 @@ npm run dev
 Stripe test card visa: 4242424242424242
 
 
-# TODO
-- [ ] Add detail to user subscription description: subscription name, start, end, price, status.
+# SIMULATION
+## invoice.payment_succeeded
+```bash
+stripe subscriptions retrieve sub_1RR6AmPObval7WyW6Mridqsc
+stripe invoices create --customer=$(stripe subscriptions retrieve sub_1RR6AmPObval7WyW6Mridqsc | jq -r .customer) --subscription=sub_1RR6AmPObval7WyW6Mridqsc # create a fake invoice
+stripe invoices finalize in_xxx
+stripe invoices pay in_xxx
+```
+
+or update `trigger-payment-succeeded.json` and run:
+```bash
+stripe fixtures simulation/trigger-payment-succeeded.json
+```
+
+## invoice.payment_failed
+update `trigger-payment-failed.json` and run:
+```bash
+stripe fixtures simulation/trigger-payment-failed.json
+```
 
 
 
