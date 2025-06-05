@@ -154,6 +154,7 @@
                 subscriptions={userSubscriptionList.subscriptions}
                 {userId}
                 type="user"
+                locationId={currentLocationId ?? ""}
             />
         {:else}
             <p class="text-center text-gray-500">
@@ -169,6 +170,7 @@
                 subscriptions={locationSubscriptionList.subscriptions}
                 {userId}
                 type="location"
+                locationId={currentLocationId ?? ""}
             />
         {:else}
             <p class="text-center text-gray-500">

@@ -1,10 +1,11 @@
 <script lang="ts">
     import { subscriptionHandlers } from "$lib/store/subscriptionStore";
+    import { locationHandler } from "$lib/store/locationStore";
     import { onMount } from "svelte";
     import type {
         SubscriptionUserItem,
         SubscriptionLocationItem,
-
+        Location
     } from "$lib/type";
     import type { PageData } from "./$types";
     import { goto } from "$app/navigation";
@@ -12,27 +13,17 @@
     export let data: PageData;
     let locationName: string | null = null;
     // Get the parameters from the load function
-    $: ({ userId, subscriptionType, subscriptionId } = data);
+    $: ({ userId, locationId, subscriptionId } = data);
 
-    let locations: SubscriptionLocationItem[] | null = null;
-
-    let subscriptionItems:
-        | SubscriptionUserItem[]
-        | SubscriptionLocationItem[]
-        | null = null;
-
+    let subscriptionItems: SubscriptionLocationItem[] | null = null;
+    let location: Location | null = null;
     onMount(async () => {
-        
+        location = await locationHandler.getLocation(locationId);
         subscriptionItems =
-            subscriptionType === "user"
-                ? await subscriptionHandlers.getSubscriptionUserItems(
-                      userId,
-                      subscriptionId,
-                  )
-                : await subscriptionHandlers.getSubscriptionLocationItems(
-                      userId,
-                      subscriptionId,
-                  );
+            await subscriptionHandlers.getSubscriptionLocationItems(
+                locationId,
+                subscriptionId,
+            );
         console.log("Subscription Items", subscriptionItems);
     });
 
@@ -64,10 +55,11 @@
     </div>
     <div class="flex flex-col gap-2 items-start mb-6">
         <h1 class="text-2xl font-bold">Subscription Information</h1>
-        <p><strong>Type:</strong> {subscriptionType.toUpperCase()}</p>
-        <div class="flex items-center gap-2">
-            
-        </div>
+        <p><strong>Type:</strong> Location</p>  
+        <p><strong>Name:</strong> {location?.name || "N/A"}</p>
+        <p><strong>Insight enabled:</strong> {location?.insightCertified ? "Enabled" : "Disabled"}</p>
+
+        <div class="flex items-center gap-2"></div>
     </div>
     <div class="flex flex-col gap-8 items-center">
         <h2 class="text-xl font-semibold mb-4 text-center">

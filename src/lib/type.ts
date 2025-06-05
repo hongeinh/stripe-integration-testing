@@ -27,7 +27,7 @@ export interface Location {
     name: string;
     address: string;
     insightCertified: boolean;
-    employeeIds: string[],
+    employees: string[],
 }
 
 export interface Subscription {

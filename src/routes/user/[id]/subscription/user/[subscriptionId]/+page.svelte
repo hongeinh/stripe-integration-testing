@@ -3,36 +3,26 @@
     import { onMount } from "svelte";
     import type {
         SubscriptionUserItem,
-        SubscriptionLocationItem,
-
+        User
     } from "$lib/type";
     import type { PageData } from "./$types";
     import { goto } from "$app/navigation";
-
+    import { userHandler } from "$lib/store/userStore";
     export let data: PageData;
-    let locationName: string | null = null;
     // Get the parameters from the load function
-    $: ({ userId, subscriptionType, subscriptionId } = data);
+    $: ({ userId, subscriptionId } = data);
 
-    let locations: SubscriptionLocationItem[] | null = null;
 
-    let subscriptionItems:
-        | SubscriptionUserItem[]
-        | SubscriptionLocationItem[]
-        | null = null;
+    let subscriptionItems: SubscriptionUserItem[] | null = null;
+    let user: User | null = null;
 
     onMount(async () => {
-        
-        subscriptionItems =
-            subscriptionType === "user"
-                ? await subscriptionHandlers.getSubscriptionUserItems(
-                      userId,
-                      subscriptionId,
-                  )
-                : await subscriptionHandlers.getSubscriptionLocationItems(
-                      userId,
-                      subscriptionId,
-                  );
+        const { userData } = await userHandler.getUser(userId);
+        user = userData;
+        subscriptionItems = await subscriptionHandlers.getSubscriptionUserItems(
+            userId,
+            subscriptionId,
+        );
         console.log("Subscription Items", subscriptionItems);
     });
 
@@ -64,9 +54,11 @@
     </div>
     <div class="flex flex-col gap-2 items-start mb-6">
         <h1 class="text-2xl font-bold">Subscription Information</h1>
-        <p><strong>Type:</strong> {subscriptionType.toUpperCase()}</p>
+        <p><strong>Type:</strong> User</p>
         <div class="flex items-center gap-2">
-            
+            <p><strong>User:</strong> {user?.name}</p>
+            <p><strong>Email:</strong> {user?.email}</p>
+            <p><strong>Insight Lookup:</strong> {user?.insightLookup ? "Enabled" : "Disabled"}</p>
         </div>
     </div>
     <div class="flex flex-col gap-8 items-center">

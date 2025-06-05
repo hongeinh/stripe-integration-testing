@@ -41,7 +41,7 @@ export const userHandler = {
             const locationSubscriptionRef = doc(db, 'subscriptionLocationList', userData.currentLocationId);
             const locationSubscriptionDoc = await getDoc(locationSubscriptionRef);
             const locationSubscriptionData = (locationSubscriptionDoc.exists() ? locationSubscriptionDoc.data() : null) as SubscriptionLocationList;
-            
+
             // Fetch userSubscriptionHistory data from Firestore
             userStore.update((store) => ({
                 ...store,
@@ -74,14 +74,14 @@ export const userHandler = {
         if (!locationId || !userId || !newLocationId) {
             throw new Error("Location ID and User ID are required");
         }
-        
+
         try {
             // update old location
             const locationRef = doc(db, 'locations', locationId);
             const locationDoc = await getDoc(locationRef);
             const locationData = locationDoc.data() as Location;
-            locationData.employeeIds = locationData.employeeIds.filter((user) => user !== userId);
-            await updateDoc(locationRef, { employeeIds: locationData.employeeIds });
+            locationData.employees = locationData.employees.filter((user) => user !== userId);
+            await updateDoc(locationRef, { employeeIds: locationData.employees });
 
             // update user location
             const userRef = doc(db, 'users', userId);
@@ -94,9 +94,9 @@ export const userHandler = {
             const newLocationRef = doc(db, 'locations', newLocationId);
             const newLocationDoc = await getDoc(newLocationRef);
             const newLocationData = newLocationDoc.data() as Location;
-            newLocationData.employeeIds.push(userId);
-            await updateDoc(newLocationRef, { employeeIds: newLocationData.employeeIds });
-            
+            newLocationData.employees.push(userId);
+            await updateDoc(newLocationRef, { employeeIds: newLocationData.employees });
+
             await updateDoc(userRef, {
                 ...userData,
             });

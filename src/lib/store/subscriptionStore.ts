@@ -19,6 +19,7 @@ export const subscriptionHandlers = {
     getSubscriptionLocationItems: async (locationId: string, subscriptionId: string) => {
         const response = await fetch(`/api/subscription/items?locationId=${locationId}&subscriptionId=${subscriptionId}&type=location`);
         const data = await response.json();
+        console.log("Subscription Location Items", data);
         return data as SubscriptionLocationItem[];
     }
 }

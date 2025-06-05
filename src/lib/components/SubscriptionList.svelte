@@ -4,6 +4,7 @@
     import type { Subscription } from "$lib/type";
     export let subscriptions: Subscription[];
     export let userId: string;
+    export let locationId: string;
     export let type: "user" | "location";
 
     const cancelSubscription = async (subscriptionId: string) => {
@@ -23,6 +24,14 @@
             style: "currency",
             currency: currency.toUpperCase(),
         }).format(amount / 100);
+    }
+
+    function viewSubscriptionItems(subscriptionId: string) {
+        if (type === "user") {
+            goto(`/user/${userId}/subscription/user/${subscriptionId}`);
+        } else {
+            goto(`/user/${userId}/subscription/location/${locationId}/${subscriptionId}`);
+        }
     }
 </script>
 
@@ -101,7 +110,7 @@
                         class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
                     >
                         <button 
-                        on:click={() => {goto(`/user/${userId}/subscription/${type}/${subscription.id}`)}}
+                        on:click={() => {viewSubscriptionItems(subscription.id)}}
                         class="text-blue-600 hover:text-blue-800">
                             View History
                         </button>
